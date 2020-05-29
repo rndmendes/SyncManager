@@ -98,7 +98,7 @@ function Sync-FilesAndFolders{
     }else{
         Compare-Object  -ReferenceObject (Get-ChildItem -Path $SourcePath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName}) `
                         -DifferenceObject (Get-ChildItem -Path $DestinationPath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName}) `
-                        -Property Path, Hash -PassThru |
+                        -Property Hash -PassThru |
         Select-Object Hash, Path, SideIndicator |
         ForEach-Object {
             $file = Get-Item -Path $_.Path
