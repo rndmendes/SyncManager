@@ -4,9 +4,6 @@ PowerShell Module to Synchronize files and folders.
 This module uses Powershell CmdLets to synchronize two folders and all contained files.
 It is **bidirectional**, meaning that any change occurred in any side (source or destination) will be replicated.
 
->*Note:* In this version, any deleted files or folders (in one of the sides) will be created again, 
-meaning that there's no "dominant" side. See **TODO** section for more details
-
 ## Details
 - Supports local and remote shared folders with UNC paths
 - Remember to check access rights on shared folders before using.
