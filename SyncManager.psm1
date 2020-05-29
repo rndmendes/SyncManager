@@ -68,7 +68,7 @@ function Sync-FilesAndFolders{
     $error.Clear()
     if(-not $Log){
         $Log = "C:\Logs\syncFileStructure_log.txt"
-        Write-Verbose "A file path was not provided. Using the default file: $Log"
+        Write-Output "A file path was not provided. Using the default file: $Log"
         New-Item -ItemType File -Path $Log -Force | Out-Null
     }
     try{
@@ -77,25 +77,25 @@ function Sync-FilesAndFolders{
         }
     }catch{
         Write-Error $error[0].Exception.Message
-        exit
+        return
     }        
     if(-not(Test-Path -Path $DestinationPath)){
         $create = Read-Host "Detination path does not exist. Create? [Y / N]"
         if($create -eq 'Y'){
             New-Item -Path $DestinationPath -ItemType Directory | Out-Null
-            robocopy $SourcePath $DestinationPath /mir /log+: $Log
-            exit
+            robocopy $SourcePath $DestinationPath /mir /log: $Log
+            return
         }else{
             Write-Output "Script was terminated."
-            exit
+            return
         }
     }
-    Write-Debug $DominantSide
+
     #$sourceFiles = Get-ChildItem -Path $SourcePath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName}
     $DestinationFiles = Get-ChildItem -Path $DestinationPath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName} -ErrorAction SilentlyContinue
 
     if((-not $Sync) -or (-not $DestinationFiles)){
-        robocopy $SourcePath $DestinationPath /mir /log+: $Log
+        robocopy $SourcePath $DestinationPath /mir /log: $Log
     }else{
         Compare-Object  -ReferenceObject (Get-ChildItem -Path $SourcePath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName}) `
                         -DifferenceObject (Get-ChildItem -Path $DestinationPath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName}) `
