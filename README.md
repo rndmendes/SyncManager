@@ -15,7 +15,7 @@ This module exposes a unique function called Sync-FilesAndFolders.
 
 To use, call the module function as below:
 
-<code>Sync-FilesAndFolders -SourcePath "C:\SourceFolder" -DestinationPath "\\SVR01\RemoteFolder" -Log "C:\Logs\logFile.txt" -Sync</code>
+<code>Sync-FilesAndFolders -SourcePath "C:\SourceFolder" -DestinationPath "\\\SVR01\RemoteFolder" -Log "C:\Logs\logFile.txt" -Sync</code>
 
 - - -
 ### Parameters
