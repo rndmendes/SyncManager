@@ -91,7 +91,6 @@ function Sync-FilesAndFolders{
         }
     }
 
-    #$sourceFiles = Get-ChildItem -Path $SourcePath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName}
     $DestinationFiles = Get-ChildItem -Path $DestinationPath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName} -ErrorAction SilentlyContinue
 
     if((-not $Sync) -or (-not $DestinationFiles)){
@@ -185,8 +184,6 @@ function Sync-FilesAndFolders{
         }
     }
     #Region Empty Folders
-    #$sourceFolders = Get-ChildItem -Path $SourcePath -Recurse -Directory
-    #$DestinationFolders = Get-ChildItem -Path $DestinationPath -Recurse -Directory
     Compare-Object  -ReferenceObject (Get-ChildItem -Path $SourcePath -Recurse -Directory) `
                     -DifferenceObject (Get-ChildItem -Path $DestinationPath -Recurse -Directory) |
     ForEach-Object {
