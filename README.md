@@ -30,9 +30,11 @@ To use, call the module function as below:
 
 - **Sync** is a switch parameter. If present, bidirectional sync will be performed. If not present, sourcePath will be cloned to destinationPath
 
+* **DominantSide** - a ValidateSet parameter with three possible values: "Left", "Right", "None"
+  * If absent or 'None', will perform a bidireactional synchronization.
+  * If 'Left', items existing only on the left side will be copied. All non corresponding items on the right side will be deleted
+  * If 'Right', items existing only on the right side will be copied. All non corresponding items on the left side will be deleted
+
 ## TODO
 
-- Implement "dominant" side parameter. The ideia is to tell the script which side is dominant so that, in case of folder 
-or file deletion on the dominant side, this may be reflected on non dominant side. This parameter will be a ValidateSet with 
-three possible values: "Left", "Right", "None"
 - Implement PSSession for remote operations
