@@ -28,7 +28,7 @@ To use, call the module function as below:
 - **Sync** is a switch parameter. If present, bidirectional sync will be performed. If not present, sourcePath will be cloned to destinationPath
 
 * **DominantSide** - a ValidateSet parameter with three possible values: "Left", "Right", "None"
-  * If absent or 'None', will perform a bidireactional synchronization.
+  * If absent or 'None', will perform a bidirectional synchronization.
   * If 'Left', items existing only on the left side will be copied. All non corresponding items on the right side will be deleted
   * If 'Right', items existing only on the right side will be copied. All non corresponding items on the left side will be deleted
 
