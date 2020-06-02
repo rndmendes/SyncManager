@@ -17,6 +17,9 @@ To use, call the module function as below:
 
 <code>Sync-FilesAndFolders -SourcePath "C:\SourceFolder" -DestinationPath "\\\SVR01\RemoteFolder" -Log "C:\Logs\logFile.txt" -Sync</code>
 
+### Output
+It now outputs a PSCustomObject so one can pipe it to Out-GridView
+
 - - -
 ### Parameters
 - **SourcePath** is mandatory and has to be a valid path
