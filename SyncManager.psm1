@@ -68,7 +68,6 @@ function Sync-FilesAndFolders{
     $error.Clear()
     if(-not $Log){
         $Log = "C:\Logs\syncFileStructure_log.txt"
-        #Write-Output "A file path was not provided. Using the default file: $Log"
         New-Item -ItemType File -Path $Log -Force | Out-Null
     }
     try{
@@ -91,156 +90,144 @@ function Sync-FilesAndFolders{
         }
     }
 
-    $DestinationFiles = Get-ChildItem -Path $DestinationPath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName} -ErrorAction SilentlyContinue
-
+    $DestinationFiles = Get-ChildItem -Path $DestinationPath -Recurse -File -ErrorAction SilentlyContinue
+    $SourceFiles = Get-ChildItem -Path $SourcePath -Recurse -File -ErrorAction SilentlyContinue
     if((-not $Sync) -or (-not $DestinationFiles)){
         robocopy $SourcePath $DestinationPath /mir /log: $Log
     }else{
         $objCollection = New-Object System.Collections.ArrayList
-        Compare-Object  -ReferenceObject (Get-ChildItem -Path $SourcePath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName}) `
-                        -DifferenceObject (Get-ChildItem -Path $DestinationPath -Recurse -File | ForEach-Object {Get-FileHash -Path $_.FullName}) `
-                        -Property Hash -PassThru |
-        Select-Object Hash, Path, SideIndicator |
+        Compare-Object -ReferenceObject $SourceFiles -DifferenceObject $DestinationFiles -IncludeEqual -Property LastWriteTime,Name -PassThru | 
         ForEach-Object {
             $objProps = [ordered]@{}
-            $file = Get-Item -Path $_.Path
             if($_.SideIndicator -eq '<='){
                 # The destination folder and file do not exist
-                if(-not (Test-Path (($file.DirectoryName).Replace($SourcePath,$DestinationPath)))){
+                if(-not (Test-Path (($_.DirectoryName).Replace($SourcePath,$DestinationPath)))){
                     if(($DominantSide -eq 'Left') -or ($DominantSide -eq 'None')){
                         Write-Debug "No folder nor file - Left or None"
-                        New-Item -Path (($file.DirectoryName).Replace($SourcePath,$DestinationPath)) -ItemType Directory | Out-Null
-                        logActions -logFile $Log -logText "New directory created: $(($file.DirectoryName).Replace($SourcePath,$DestinationPath))"
-                        New-Item -Path ($file.FullName).Replace($SourcePath,$DestinationPath) -ItemType File | Out-Null
-                        logActions -logFile $Log -logText "New file created: $(($file.FullName).Replace($SourcePath,$DestinationPath))"
-                        $objProps.Add("OriginalObject","")
-                        $objProps.Add("Object",$file.DirectoryName)
-                        $objProps.Add("Action","Create")
-                        $objProps.Add("Type","Directory;File")
-                        $objProps.Add("Side","Destination")                        
+                        Copy-Item -Path ($_.DirectoryName) -Destination (($_.DirectoryName).Replace($SourcePath,$DestinationPath)) -Recurse | Out-Null
+                        logActions -logFile $Log -logText "Directory copied: $(($_.FullName).Replace($SourcePath,$DestinationPath))"
+                        $objProps.Add("ObjectType","Directory;File")
+                        $objProps.Add("Path",$_.DirectoryName)
+                        $objProps.Add("Action","Copy")
+                        $objProps.Add("From","Left")
+                        $objProps.Add("To","Right")                        
                     }else{
-                        Remove-Item -Path $file.DirectoryName -Force -Recurse | Out-Null
-                        logActions -logFile $Log -logText "Deleted directory and files: $($file.DirectoryName)"
-                        $objProps.Add("OriginalObject","")
-                        $objProps.Add("Object",$file.DirectoryName)
+                        Remove-Item -Path $_.DirectoryName -Force -Recurse | Out-Null
+                        logActions -logFile $Log -logText "Deleted directory and files: $($_.DirectoryName)"
+                        $objProps.Add("ObjectType","Directory;File")
+                        $objProps.Add("Path",$_.DirectoryName)
                         $objProps.Add("Action","Delete")
-                        $objProps.Add("Type","Directory;File")
-                        $objProps.Add("Side","Destination")                        
+                        $objProps.Add("From","Left")
+                        $objProps.Add("To","")                        
                     }
                 }else{
                     #The destination folder exists, but not the file
-                    if(-not (Test-Path -Path ($file.FullName).Replace($SourcePath,$DestinationPath))){
+                    if(-not (Test-Path -Path ($_.FullName).Replace($SourcePath,$DestinationPath))){
                         if(($DominantSide -eq 'Left') -or ($DominantSide -eq 'None')){
-                            New-Item -Path ($file.FullName).Replace($SourcePath,$DestinationPath) -ItemType File | Out-Null
-                            logActions -logFile $Log -logText "New file created: $(($file.FullName).Replace($SourcePath,$DestinationPath))"
-                            $objProps.Add("OriginalObject","")
-                            $objProps.Add("Object",($file.FullName).Replace($SourcePath,$DestinationPath))
-                            $objProps.Add("Action","Create")
-                            $objProps.Add("Type","File")
-                            $objProps.Add("Side","Destination")
+                            Copy-Item -Path ($_.FullName) -Destination ($_.FullName).Replace($SourcePath,$DestinationPath) | Out-Null
+                            logActions -logFile $Log -logText "New file created: $(($_.FullName).Replace($SourcePath,$DestinationPath))"
+                            $objProps.Add("ObjectType","File")
+                            $objProps.Add("Path",($_.FullName).Replace($SourcePath,$DestinationPath))
+                            $objProps.Add("Action","Copy")
+                            $objProps.Add("From","Left")
+                            $objProps.Add("To","Right")
                         }else{
-                            Remove-Item -Path $file.FullName -Force | Out-Null
-                            logActions -logFile $Log -logText "Deleted file: $($file.FullName)"
-                            $objProps.Add("OriginalObject","")
-                            $objProps.Add("Object",$file.FullName)
+                            Remove-Item -Path $_.FullName -Force | Out-Null
+                            logActions -logFile $Log -logText "Deleted file: $($_.FullName)"
+                            $objProps.Add("ObjectTypr","File")
+                            $objProps.Add("Path",$_.FullName)
                             $objProps.Add("Action","Delete")
-                            $objProps.Add("Type","File")
-                            $objProps.Add("Side","Destination")                            
+                            $objProps.Add("From","Left")
+                            $objProps.Add("To","")                            
                         }
                     }else{ # The file exists in both sides, lets compare the file hash
-                        $destFile = Get-Item -Path ($file.FullName).Replace($SourcePath,$DestinationPath)
-                        if($_.Hash -ne ($destFile | Get-FileHash)){
-                            #Determine which one has the most recent write date
-                            if($file.LastWriteTime -gt $destFile.LastWriteTime){
-                                Remove-Item -Path $destFile.FullName | Out-Null
-                                Copy-Item -Path $file.FullName -Destination $destFile.FullName | Out-Null
-                                logActions -logFile $Log -logText "File updated: $($destFile.FullName)"
-                                $objProps.Add("OriginalObject",$destFile.FullName)
-                                $objProps.Add("Object",$file.FullName)
-                                $objProps.Add("Action","Update")
-                                $objProps.Add("Type","File")
-                                $objProps.Add("Side","Destination")                                        
-                            }elseif($file.LastWriteTime -lt $destFile.LastWriteTime){
-                                Remove-Item -Path $file.FullName | Out-Null
-                                Copy-Item -Path $destFile.FullName -Destination $file.FullName | Out-Null 
-                                logActions -logFile $Log -logText "File updated: $($file.FullName)"
-                                $objProps.Add("OriginalObject",$file.FullName)
-                                $objProps.Add("Object",$destFile.FullName)
-                                $objProps.Add("Action","Update")
-                                $objProps.Add("Type","File")      
-                                $objProps.Add("Side","Destination")                           
-                            }
+                        $destFile = Get-Item -Path ($_.FullName).Replace($SourcePath,$DestinationPath)
+                        #Determine which one has the most recent write date
+                        if($_.LastWriteTime -gt $destFile.LastWriteTime){
+                            Remove-Item -Path $destFile.FullName | Out-Null
+                            Copy-Item -Path $_.FullName -Destination $destFile.FullName | Out-Null
+                            logActions -logFile $Log -logText "File updated: $($destFile.FullName)"
+                            $objProps.Add("ObjectType","File")
+                            $objProps.Add("Path",$destFile.FullName)
+                            $objProps.Add("Action","Update")
+                            $objProps.Add("from","Left")
+                            $objProps.Add("To","Right")                                        
+                        }elseif($_.LastWriteTime -lt $destFile.LastWriteTime){
+                            Remove-Item -Path $_.FullName | Out-Null
+                            Copy-Item -Path $destFile.FullName -Destination $_.FullName | Out-Null 
+                            logActions -logFile $Log -logText "File updated: $($_.FullName)"
+                            $objProps.Add("ObjectType","File")
+                            $objProps.Add("Path",$_.FullName)
+                            $objProps.Add("Action","Update")
+                            $objProps.Add("From","Left")      
+                            $objProps.Add("To","Right")                           
                         }
                     }                    
                 }
             }elseif($_.SideIndicator -eq '=>'){
                 # The source folder and file do not exist
-                if(-not (Test-Path (($file.DirectoryName).Replace($DestinationPath,$SourcePath)))){
+                if(-not (Test-Path (($_.DirectoryName).Replace($DestinationPath,$SourcePath)))){
                     if(($DominantSide -eq 'Right') -or ($DominantSide -eq 'None')){
-                        New-Item -Path (($file.DirectoryName).Replace($DestinationPath,$SourcePath)) -ItemType Directory | Out-Null
-                        logActions -logFile $Log -logText "New directory created: $(($file.DirectoryName).Replace($DestinationPath,$SourcePath))"
-                        New-Item -Path ($file.FullName).Replace($DestinationPath,$SourcePath) -ItemType File | Out-Null
-                        logActions -logFile $Log -logText "New file created: $(($file.FullName).Replace($DestinationPath,$SourcePath))"
-                        $objProps.Add("OriginalObject","")
-                        $objProps.Add("Object",($file.FullName).Replace($DestinationPath,$SourcePath))
-                        $objProps.Add("Action","Create")
-                        $objProps.Add("Type","Directory;File")      
-                        $objProps.Add("Side","Source")                            
+                        Copy-Item -Path $_.DirectoryName -Destination (($_.DirectoryName).Replace($DestinationPath,$SourcePath)) -Recurse | Out-Null
+                        logActions -logFile $Log -logText "Directory Copied to: $(($_.FullName).Replace($DestinationPath,$SourcePath))"
+                        $objProps.Add("ObjectType","Directory;File")
+                        $objProps.Add("Path",$_.DirectoryName)
+                        $objProps.Add("Action","Copy")
+                        $objProps.Add("From","Right")      
+                        $objProps.Add("To","Left")                            
                     }else{
-                        Remove-Item -Path $file.DirectoryName -Force -Recurse | Out-Null
-                        logActions -logFile $Log -logText "Deleted directory and files: $($file.DirectoryName)"  
-                        $objProps.Add("OriginalObject","")
-                        $objProps.Add("Object",($file.DirectoryName))
+                        Remove-Item -Path $_.DirectoryName -Force -Recurse | Out-Null
+                        logActions -logFile $Log -logText "Deleted directory and files: $($_.DirectoryName)"  
+                        $objProps.Add("ObjectType","Directory;File")
+                        $objProps.Add("Path",($_.DirectoryName))
                         $objProps.Add("Action","Delete")
-                        $objProps.Add("Type","Directory;File")      
-                        $objProps.Add("Side","Source")                                                 
+                        $objProps.Add("From","Right")      
+                        $objProps.Add("To","")                                                 
                     }
 
                 }else{
                     #The destination folder exists, but not the file
-                    if(-not (Test-Path -Path ($file.FullName).Replace($DestinationPath,$SourcePath))){
+                    if(-not (Test-Path -Path ($_.FullName).Replace($DestinationPath,$SourcePath))){
                         if(($DominantSide -eq 'Right') -or ($DominantSide -eq 'None')){
-                            New-Item -Path ($file.FullName).Replace($DestinationPath,$SourcePath) -ItemType File | Out-Null
-                            logActions -logFile $Log -logText "New file created: $(($file.FullName).Replace($DestinationPath,$SourcePath))"
-                            $objProps.Add("OriginalObject","")
-                            $objProps.Add("Object",($file.FullName).Replace($DestinationPath,$SourcePath))
-                            $objProps.Add("Action","Create")
-                            $objProps.Add("Type","File")      
-                            $objProps.Add("Side","Source")                            
+                            Copy-Item -Path $_.FullName -Destination ($_.FullName).Replace($DestinationPath,$SourcePath) | Out-Null
+                            logActions -logFile $Log -logText "File copied to: $(($_.FullName).Replace($DestinationPath,$SourcePath))"
+                            $objProps.Add("ObjectType","File")
+                            $objProps.Add("Path",$_.FullName)
+                            $objProps.Add("Action","Copy")
+                            $objProps.Add("From","Right")      
+                            $objProps.Add("To","Left")                            
                         }else{
-                            Remove-Item -Path $file.FullName -Force -Recurse | Out-Null
-                            logActions -logFile $Log -logText "Deleted file: $($file.FullName)"
-                            $objProps.Add("OriginalObject","")
-                            $objProps.Add("Object",$file.FullName)
+                            Remove-Item -Path $_.FullName -Force -Recurse | Out-Null
+                            logActions -logFile $Log -logText "Deleted file: $($_.FullName)"
+                            $objProps.Add("ObjectType","File")
+                            $objProps.Add("Path",$_.FullName)
                             $objProps.Add("Action","Delete")
-                            $objProps.Add("Type","File")      
-                            $objProps.Add("Side","Source")                                                        
+                            $objProps.Add("From","Right")      
+                            $objProps.Add("Side","")                                                        
                         }
                     }else{ # The file exists in both sides, lets compare the file hash
-                        $destFile = Get-Item -Path ($file.FullName).Replace($DestinationPath,$SourcePath)
-                        if($_.Hash -ne ($destFile | Get-FileHash)){
-                            #Determine which one has the most recent write date
-                            if($file.LastWriteTime -gt $destFile.LastWriteTime){
-                                Remove-Item -Path $destFile.FullName | Out-Null
-                                Copy-Item -Path $file.FullName -Destination $destFile.FullName | Out-Null
-                                logActions -logFile $Log -logText "File updated: $($destFile.FullName)"
-                                $objProps.Add("OriginalObject",$destFile.Fullname)
-                                $objProps.Add("Object",$file.FullName)
-                                $objProps.Add("Action","Update")
-                                $objProps.Add("Type","File")      
-                                $objProps.Add("Side","Source")                                        
-                            }elseif($file.LastWriteTime -lt $destFile.LastWriteTime){
-                                Remove-Item -Path $file.FullName | Out-Null
-                                Copy-Item -Path $destFile.FullName -Destination $file.FullName | Out-Null
-                                logActions -logFile $Log -logText "File updated: $($file.FullName)"
-                                $objProps.Add("OriginalObject",$file.Fullname)
-                                $objProps.Add("Object",$destFile.FullName)
-                                $objProps.Add("Action","Update")
-                                $objProps.Add("Type","File")      
-                                $objProps.Add("Side","Source")                                 
-                            }
+                        $destFile = Get-Item -Path ($_.FullName).Replace($DestinationPath,$SourcePath)
+                        #Determine which one has the most recent write date
+                        if($_.LastWriteTime -gt $destFile.LastWriteTime){
+                            Remove-Item -Path $destFile.FullName | Out-Null
+                            Copy-Item -Path $_.FullName -Destination $destFile.FullName | Out-Null
+                            logActions -logFile $Log -logText "File updated: $($destFile.FullName)"
+                            $objProps.Add("ObjectType","File")
+                            $objProps.Add("Path",$_.FullName)
+                            $objProps.Add("Action","Update")
+                            $objProps.Add("From","Right")      
+                            $objProps.Add("To","Left")                                        
+                        }elseif($_.LastWriteTime -lt $destFile.LastWriteTime){
+                            Remove-Item -Path $_.FullName | Out-Null
+                            Copy-Item -Path $destFile.FullName -Destination $_.FullName | Out-Null
+                            logActions -logFile $Log -logText "File updated: $($_.FullName)"
+                            $objProps.Add("ObjectType","File")
+                            $objProps.Add("Path",$destFile.FullName)
+                            $objProps.Add("Action","Update")
+                            $objProps.Add("From","Left")      
+                            $objProps.Add("Side","Right")                                 
                         }
-                    }                    
+                    }
                 }           
             }
             if($objProps.Count -ne 0){
@@ -260,19 +247,19 @@ function Sync-FilesAndFolders{
                 if(($DominantSide -eq 'Left') -or ($DominantSide -eq 'None')){
                     New-Item -Path ($_.InputObject.FullName).Replace($SourcePath,$DestinationPath) -ItemType Directory | Out-Null
                     logActions -logFile $Log -logText "New directory created: $(($_.InputObject.FullName).Replace($SourcePath,$DestinationPath))"
-                    $objProps.Add("OriginalObject",$_InputObject.Fullname)
-                    $objProps.Add("Object",($_.InputObject.FullName).Replace($SourcePath,$DestinationPath))
+                    $objProps.Add("ObjectType","Directory")
+                    $objProps.Add("Path",($_.InputObject.FullName).Replace($SourcePath,$DestinationPath))
                     $objProps.Add("Action","Create")
-                    $objProps.Add("Type","Directory")      
-                    $objProps.Add("Side","Destination")                        
+                    $objProps.Add("From","")      
+                    $objProps.Add("To","Right")                        
                 }else{
                     Remove-Item -Path $_.InputObject.FullName -Force | Out-Null
-                    logActions -logFile $Log -logText "Deleted item: $($_.InputObject.FullName)"
-                    $objProps.Add("OriginalObject",$_InputObject.Fullname)
-                    $objProps.Add("Object",($_.InputObject.FullName).Replace($SourcePath,$DestinationPath))
+                    logActions -logFile $Log -logText "Deleted directory: $($_.InputObject.FullName)"
+                    $objProps.Add("ObjectType","Directory")
+                    $objProps.Add("Path",$_InputObject.Fullname)
                     $objProps.Add("Action","Delete")
-                    $objProps.Add("Type","Directory")      
-                    $objProps.Add("Side","Destination")                           
+                    $objProps.Add("From","Left")      
+                    $objProps.Add("To","")                           
                 }
 
             }
@@ -281,19 +268,19 @@ function Sync-FilesAndFolders{
                 if(($DominantSide -eq 'Right') -or ($DominantSide -eq 'None')){
                     New-Item -Path ($_.InputObject.FullName).Replace($DestinationPath,$SourcePath) -ItemType Directory | Out-Null
                     logActions -logFile $Log -logText "New directory created: $(($_.InputObject.FullName).Replace($DestinationPath,$SourcePath))"
-                    $objProps.Add("OriginalObject",$_InputObject.Fullname)
-                    $objProps.Add("Object",($_.InputObject.FullName).Replace($DestinationPath,$SourcePath))
+                    $objProps.Add("ObjectType","Directory")
+                    $objProps.Add("Path",($_.InputObject.FullName).Replace($DestinationPath,$SourcePath))
                     $objProps.Add("Action","Create")
-                    $objProps.Add("Type","Directory")      
-                    $objProps.Add("Side","Source")                           
+                    $objProps.Add("From","")      
+                    $objProps.Add("To","Left")                           
                 }else{
                     Remove-Item -Path $_.InputObject.FullName -Force | Out-Null
-                    logActions -logFile $Log -logText "Deleted item: $($_.InputObject.FullName)"
-                    $objProps.Add("OriginalObject",$_InputObject.Fullname)
-                    $objProps.Add("Object",($_.InputObject.FullName).Replace($DestinationPath,$SourcePath))
+                    logActions -logFile $Log -logText "Deleted directory: $($_.InputObject.FullName)"
+                    $objProps.Add("ObjectType","Directory")
+                    $objProps.Add("Path",$_InputObject.Fullname)
                     $objProps.Add("Action","Delete")
-                    $objProps.Add("Type","Directory")      
-                    $objProps.Add("Side","Source")                         
+                    $objProps.Add("From","Right")      
+                    $objProps.Add("To","")                         
                 }
             }            
         }
